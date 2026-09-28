@@ -45,6 +45,21 @@ npm install -g cline@nightly
 
 Platform binaries are published for macOS, Linux, and Windows on `arm64` and `x64`. The `cline` package resolves the correct binary for your platform via optional dependencies, so no Node, Bun, or Zig runtime is required at install time.
 
+Android phones, including Redmi Note devices, are not currently supported as a native install target. The CLI's published binaries do not include Android, and running it directly inside Termux is not a supported setup. From a Redmi Note, use Termux to SSH into a supported Linux or macOS computer that has Cline installed:
+
+```sh
+# In Termux on the phone
+pkg update
+pkg install openssh
+ssh <user>@<computer-address>
+
+# On the connected computer, install once and authenticate
+npm install -g cline
+cline auth
+```
+
+Then start an interactive session on that computer with `cline`, or run a one-shot task with `cline "your coding task"`. Your project files and agent tools run on the connected computer, not on the phone.
+
 ## Quick start
 
 Run interactively:
@@ -80,6 +95,14 @@ cline auth --provider anthropic --apikey sk-... --modelid claude-sonnet-4-6
 `cline auth` without a provider opens the interactive auth setup TUI with the same options as the old CLI flow (Sign in with Cline, Sign in with ChatGPT Subscription, Sign in with OCA, or use your own API key).
 
 OAuth-supported providers (`cline`, `openai-codex`, `oca`) do not auto-launch a browser on normal startup. Authenticate explicitly first with `cline auth <provider>`. For non-interactive runs, if an OAuth provider is selected and no saved credentials are available, `cline` fails fast with an authentication message instead of launching a hidden browser flow.
+
+Check configured API providers and endpoints with:
+
+```sh
+cline provider-check
+```
+
+The command probes configured endpoints and prints an `Active`, `Rate-Limited`, or `Offline` status. It returns a nonzero exit code if no endpoints are configured or any probe is unhealthy.
 
 ## Modes
 
