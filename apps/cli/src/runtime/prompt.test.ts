@@ -93,6 +93,35 @@ describe("resolveSystemPrompt workspace metadata", () => {
 	});
 });
 
+describe("resolveSystemPrompt X Coder CLI policy", () => {
+	it("appends the coding-only and complete-output guardrails", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "xcoder-prompt-"));
+		workspaceDirectories.push(cwd);
+
+		const prompt = await resolveSystemPrompt({ cwd });
+
+		expect(prompt).toContain(
+			"X Coder processes coding tasks only. Please provide project specs or resume the current task.",
+		);
+		expect(prompt).toContain("Never use placeholders");
+		expect(prompt).toContain(".xcoder/architecture.json");
+		expect(prompt).toContain(".xcoder/context.json");
+	});
+
+	it("keeps CLI guardrails even with a caller-provided system prompt", async () => {
+		const cwd = mkdtempSync(join(tmpdir(), "xcoder-override-prompt-"));
+		workspaceDirectories.push(cwd);
+
+		const prompt = await resolveSystemPrompt({
+			cwd,
+			explicitSystemPrompt: "Project-specific instructions.",
+		});
+
+		expect(prompt).toContain("Project-specific instructions.");
+		expect(prompt).toContain("X Coder v3.0 CLI Policy");
+	});
+});
+
 describe("resolveSystemPrompt YOLO mode", () => {
 	it("preserves caller rules and workspace metadata without plan/act instructions", async () => {
 		const cwd = mkdtempSync(join(tmpdir(), "cline-yolo-prompt-"));

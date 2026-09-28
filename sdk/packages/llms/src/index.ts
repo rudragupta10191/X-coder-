@@ -107,9 +107,14 @@ export {
 	resolveProviderUsageCostDisplay,
 	shouldShowProviderUsageCost,
 } from "./providers/billing";
+export { BUILTIN_PROVIDER_MANIFESTS_BY_ID } from "./providers/builtins";
 export { buildClineClientHeaders } from "./providers/cline-client-headers";
 export type * from "./providers/gateway";
 export { createGateway, DefaultGateway } from "./providers/gateway";
+export {
+	resolveApiEndpoints,
+	resolveApiKeys,
+} from "./providers/http";
 export {
 	type ProviderLocalCli,
 	resolveProviderLocalCli,

@@ -889,7 +889,7 @@ export function OnboardingMainMenuScreen(props: {
 				marginTop={1}
 			>
 				<text fg={defaultFg}>
-					<strong>Welcome to Cline</strong>
+					<strong>X Coder</strong>
 				</text>
 				<text fg="gray" marginTop={1}>
 					Connect a model provider to get started.

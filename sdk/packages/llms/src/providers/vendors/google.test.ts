@@ -2,7 +2,7 @@ import type {
 	GatewayProviderContext,
 	GatewayResolvedProviderConfig,
 } from "@cline/shared";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGoogleProviderModule, normalizeGeminiBaseUrl } from "./google";
 
 const createGoogleGenerativeAIMock = vi.hoisted(() => vi.fn());
@@ -56,6 +56,13 @@ describe("createGoogleProviderModule", () => {
 		createGoogleGenerativeAIMock.mockReset();
 		createGoogleGenerativeAIMock.mockReturnValue(googleModelMock);
 		googleModelMock.mockClear();
+		for (let index = 1; index <= 10; index++) {
+			vi.stubEnv(`GEMINI_KEY_${index}`, "");
+		}
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
 	});
 
 	it("passes custom base URLs to the Google provider", async () => {
@@ -97,6 +104,87 @@ describe("createGoogleProviderModule", () => {
 				baseURL: undefined,
 			}),
 		);
+	});
+
+	it("uses Gemini environment keys in numeric order", async () => {
+		vi.stubEnv("GEMINI_KEY_2", "second-key");
+		vi.stubEnv("GEMINI_KEY_10", "tenth-key");
+		vi.stubEnv("GEMINI_KEY_1", "first-key");
+
+		await createGoogleProviderModule(config(), context());
+
+		expect(createGoogleGenerativeAIMock).toHaveBeenCalledWith(
+			expect.objectContaining({ apiKey: "first-key" }),
+		);
+	});
+
+	it("rotates numbered manifest-declared API key variables", async () => {
+		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "primary-key");
+		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY_1", "secondary-key");
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+			.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+		await createGoogleProviderModule(
+			config({
+				apiKey: undefined,
+				apiKeyEnv: ["GOOGLE_GENERATIVE_AI_API_KEY"],
+				fetch: fetchMock,
+			}),
+			context(),
+		);
+		const providerOptions = createGoogleGenerativeAIMock.mock.calls[0]?.[0];
+		const response = await providerOptions?.fetch?.(
+			"https://generativelanguage.googleapis.com/v1beta/models",
+		);
+
+		expect(response?.status).toBe(200);
+		expect(createGoogleGenerativeAIMock).toHaveBeenCalledWith(
+			expect.objectContaining({ apiKey: "primary-key" }),
+		);
+		expect(String(fetchMock.mock.calls[1]?.[0])).toContain("key=secondary-key");
+	});
+
+	it("rotates to the next key immediately after a rate limit", async () => {
+		vi.stubEnv("GEMINI_KEY_1", "first-key");
+		vi.stubEnv("GEMINI_KEY_2", "second-key");
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(new Response("rate limited", { status: 429 }))
+			.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+		await createGoogleProviderModule(config({ fetch: fetchMock }), context());
+		const providerOptions = createGoogleGenerativeAIMock.mock.calls[0]?.[0];
+		const response = await providerOptions?.fetch?.(
+			"https://generativelanguage.googleapis.com/v1beta/models?key=initial",
+		);
+
+		expect(response?.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(String(fetchMock.mock.calls[0]?.[0])).toContain("key=first-key");
+		expect(String(fetchMock.mock.calls[1]?.[0])).toContain("key=second-key");
+	});
+
+	it("rotates on quota-marked 403 responses but not unrelated failures", async () => {
+		vi.stubEnv("GEMINI_KEY_1", "first-key");
+		vi.stubEnv("GEMINI_KEY_2", "second-key");
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				new Response('{"error":"quota exceeded"}', { status: 403 }),
+			)
+			.mockResolvedValueOnce(new Response("still forbidden", { status: 403 }));
+
+		await createGoogleProviderModule(config({ fetch: fetchMock }), context());
+		const providerOptions = createGoogleGenerativeAIMock.mock.calls[0]?.[0];
+		const response = await providerOptions?.fetch?.(
+			"https://generativelanguage.googleapis.com/v1beta/models",
+		);
+
+		expect(response?.status).toBe(403);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(String(fetchMock.mock.calls[1]?.[0])).toContain("key=second-key");
 	});
 });
 

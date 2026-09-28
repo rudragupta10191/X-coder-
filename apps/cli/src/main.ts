@@ -59,6 +59,7 @@ import {
 	identifyTelemetryAccount,
 } from "./utils/telemetry";
 import type { Config } from "./utils/types";
+import { X_CODER_BANNER, X_CODER_METADATA } from "./utils/xcoder-branding";
 
 export function stdinHasPipedInput(): boolean {
 	if (process.stdin.isTTY) return false;
@@ -663,6 +664,16 @@ export async function runCli(): Promise<void> {
 		});
 
 	program
+		.command("provider-check")
+		.description("Check configured provider endpoint health")
+		.action(async () => {
+			const { runProviderCheckCommand } = await import(
+				"./commands/provider-check"
+			);
+			ctx.exitCode = await runProviderCheckCommand({ io });
+		});
+
+	program
 		.command("version")
 		.description("Show Cline CLI version number")
 		.action(async () => {
@@ -1165,6 +1176,12 @@ export async function runCli(): Promise<void> {
 				await runAgent(pipedEffectivePrompt, config, userInstructionService);
 				return;
 			}
+		}
+
+		if (config.outputMode === "text") {
+			writeln(
+				`${c.cyan}${c.bold}${X_CODER_BANNER}${c.reset}\n${X_CODER_METADATA}`,
+			);
 		}
 
 		// Interactive mode: zen is incompatible because there is no terminal UI

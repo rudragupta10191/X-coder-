@@ -49,6 +49,12 @@ import {
 	isRetryableBeyondSdkRetries,
 } from "./error-classification";
 import { extractErrorMessage } from "./format";
+import {
+	createApiKeyFailoverFetch,
+	ensureFetch,
+	resolveApiEndpoints,
+	resolveApiKeys,
+} from "./http";
 import { createRetryEmptyResponseMiddleware } from "./middleware/retry-empty-response";
 import {
 	isAnthropicCompatibleModel,
@@ -2129,12 +2135,27 @@ function createAiSdkProvider(
 				current: undefined,
 			};
 			try {
+				const envEndpoints = resolveApiEndpoints(config);
+				const baseUrl = config.baseUrl ?? envEndpoints[0];
+				const endpoints = [
+					...new Set([...(baseUrl ? [baseUrl] : []), ...envEndpoints]),
+				];
+				const apiKeys = kind === "google" ? [] : await resolveApiKeys(config);
+				const providerFetch =
+					kind === "google"
+						? config.fetch
+						: createApiKeyFailoverFetch(ensureFetch(config.fetch), apiKeys, {
+								baseUrl,
+								endpoints,
+							});
 				const provider = await createProviderModule(
 					kind,
 					{
 						...config,
+						...(config.baseUrl || !baseUrl ? {} : { baseUrl }),
+						...(config.apiKey || !apiKeys[0] ? {} : { apiKey: apiKeys[0] }),
 						fetch: wrapFetchForStickySession(
-							wrapFetchForProviderRequestCapture(config.fetch, request),
+							wrapFetchForProviderRequestCapture(providerFetch, request),
 							request,
 							context,
 						),
